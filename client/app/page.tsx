@@ -6,6 +6,8 @@ import { PlaneTakeoff, Users, Zap, CheckCircle2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 
+import { ModeToggle } from "@/components/mode-toggle"
+
 export default function Home() {
     const containerVariants = {
         hidden: { opacity: 0 },
@@ -15,7 +17,7 @@ export default function Home() {
         }
     }
 
-    const childVariants = {
+    const childVariants: any = {
         hidden: { y: 20, opacity: 0 },
         visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 300, damping: 24 } }
     }
@@ -35,6 +37,7 @@ export default function Home() {
                     <span className="text-xl font-bold tracking-tight">Trip<span className="text-primary">Sync</span></span>
                 </div>
                 <nav className="flex items-center gap-4">
+                    <ModeToggle />
                     <Link href="/join">
                         <Button variant="ghost" className="font-semibold hidden sm:inline-flex">Join Trip</Button>
                     </Link>

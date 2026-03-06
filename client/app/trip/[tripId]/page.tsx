@@ -6,10 +6,13 @@ import { motion, AnimatePresence } from "framer-motion"
 import { format } from "date-fns"
 import {
     Users, CalendarIcon, Plus, Trash2, CheckCircle2,
-    Circle, MapPin, Search, Copy, Check, Clock, ShieldCheck
+    Circle, MapPin, Search, Copy, Check, Clock, ShieldCheck, Zap
 } from "lucide-react"
+import confetti from "canvas-confetti"
+import { cn } from "@/lib/utils"
 
 import { Button } from "@/components/ui/button"
+import { ModeToggle } from "@/components/mode-toggle"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -141,6 +144,24 @@ export default function TripDashboard() {
     const completedItems = currentTrip?.items.filter(i => i.checked).length || 0
     const progressPercentage = totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100)
 
+    // Confetti Celebration!
+    useEffect(() => {
+        if (progressPercentage === 100 && totalItems > 0) {
+            confetti({
+                particleCount: 150,
+                spread: 80,
+                origin: { y: 0.6 }
+            });
+            setTimeout(() => {
+                toast({
+                    title: "Trip Fully Packed! 🎉",
+                    description: "Ready for takeoff! Have a great journey.",
+                    variant: "success",
+                })
+            }, 1000);
+        }
+    }, [progressPercentage, totalItems, toast])
+
     if (loading || !currentTrip || !currentUser) {
         return (
             <div className="flex min-h-screen items-center justify-center p-8 bg-slate-50 dark:bg-slate-950">
@@ -179,7 +200,8 @@ export default function TripDashboard() {
                             <span className="text-slate-500 hidden sm:block">{isConnected ? 'Live Sync Active' : 'Connecting...'}</span>
                         </div>
                         <div className="h-8 w-px bg-border"></div>
-                        <div className="flex items-center gap-2">
+                        <ModeToggle />
+                        <div className="flex items-center gap-2 ml-2">
                             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold shadow-sm">
                                 {currentUser.name.charAt(0).toUpperCase()}
                             </div>
