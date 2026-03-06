@@ -1,0 +1,414 @@
+"use client"
+
+import { useEffect, useState, useMemo } from "react"
+import { useParams, useRouter } from "next/navigation"
+import { motion, AnimatePresence } from "framer-motion"
+import { format } from "date-fns"
+import {
+    Users, CalendarIcon, Plus, Trash2, CheckCircle2,
+    Circle, MapPin, Search, Copy, Check, Clock, ShieldCheck
+} from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Progress } from "@/components/ui/progress"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
+import { useTripStore } from "@/store/useTripStore"
+import { useSocket, getSocket } from "@/hooks/useSocket"
+import { useToast } from "@/hooks/use-toast"
+
+export default function TripDashboard() {
+    const params = useParams()
+    const router = useRouter()
+    const tripId = params.tripId as string
+    const { toast } = useToast()
+
+    const {
+        currentTrip,
+        currentUser,
+        isConnected,
+        setTrip,
+        clearTrip
+    } = useTripStore()
+
+    // Initialize socket
+    const { socket } = useSocket(currentTrip?.tripId)
+
+    const [loading, setLoading] = useState(!currentTrip)
+    const [copied, setCopied] = useState(false)
+    const [newItemName, setNewItemName] = useState("")
+    const [newItemCategory, setNewItemCategory] = useState("Essentials")
+
+    const categories = ["Clothes", "Electronics", "Essentials", "Documents"]
+
+    // Fetch trip if not in store (direct URL hit)
+    useEffect(() => {
+        if (!currentUser) {
+            toast({
+                title: "Authentication Required",
+                description: "Please join the trip to access the dashboard.",
+                variant: "destructive"
+            })
+            router.push("/join")
+            return
+        }
+
+        if (!currentTrip) {
+            const fetchTrip = async () => {
+                try {
+                    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'
+                    const res = await fetch(`${serverUrl}/api/trip/${tripId}`)
+                    if (!res.ok) throw new Error("Trip not found")
+                    const data = await res.json()
+                    setTrip(data.trip)
+                } catch (error) {
+                    router.push("/join")
+                } finally {
+                    setLoading(false)
+                }
+            }
+            fetchTrip()
+        } else {
+            setLoading(false)
+        }
+    }, [tripId, currentUser, currentTrip, setTrip, router, toast])
+
+    const handleCopyId = () => {
+        navigator.clipboard.writeText(tripId)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+        toast({
+            title: "Copied!",
+            description: "Trip ID copied to clipboard",
+            variant: "default"
+        })
+    }
+
+    const handleAddItem = (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newItemName.trim() || !currentUser) return
+
+        const skt = getSocket()
+        if (skt) {
+            skt.emit('add_item', {
+                tripId,
+                itemName: newItemName.trim(),
+                category: newItemCategory,
+                addedBy: currentUser.name
+            })
+            setNewItemName("")
+        }
+    }
+
+    const toggleItem = (itemId: string, currentStatus: boolean) => {
+        if (!currentUser) return
+        const skt = getSocket()
+        if (skt) {
+            skt.emit('toggle_item', {
+                tripId,
+                itemId,
+                checked: !currentStatus,
+                memberName: currentUser.name,
+                memberId: currentUser.memberId
+            })
+        }
+    }
+
+    const deleteItem = (itemId: string) => {
+        const skt = getSocket()
+        if (skt) {
+            skt.emit('delete_item', { tripId, itemId })
+        }
+    }
+
+    const assignItem = (itemId: string, assigneeId: string | null, assigneeName: string | null) => {
+        const skt = getSocket()
+        if (skt) {
+            skt.emit('assign_item', { tripId, itemId, assigneeId, assigneeName })
+        }
+    }
+
+    const logout = () => {
+        clearTrip()
+        router.push("/")
+    }
+
+    // Derived state
+    const totalItems = currentTrip?.items.length || 0
+    const completedItems = currentTrip?.items.filter(i => i.checked).length || 0
+    const progressPercentage = totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100)
+
+    if (loading || !currentTrip || !currentUser) {
+        return (
+            <div className="flex min-h-screen items-center justify-center p-8 bg-slate-50 dark:bg-slate-950">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
+                    <p className="text-muted-foreground animate-pulse text-lg font-medium">Syncing flight paths...</p>
+                </div>
+            </div>
+        )
+    }
+
+    const getCategoryColor = (cat: string) => {
+        switch (cat) {
+            case 'Clothes': return "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 border-rose-200 dark:border-rose-800"
+            case 'Electronics': return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800"
+            case 'Documents': return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800"
+            default: return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+        }
+    }
+
+    return (
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950/50 pb-20">
+            {/* Premium Header Profile Bar */}
+            <div className="bg-white dark:bg-slate-900 border-b shadow-sm sticky top-0 z-30">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <MapPin className="h-5 w-5 text-primary" />
+                        <span className="font-semibold text-lg hidden sm:block">TripSync Dashboard</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 text-sm">
+                            <span className="relative flex h-3 w-3">
+                                {isConnected && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>}
+                                <span className={`relative inline-flex rounded-full h-3 w-3 ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                            </span>
+                            <span className="text-slate-500 hidden sm:block">{isConnected ? 'Live Sync Active' : 'Connecting...'}</span>
+                        </div>
+                        <div className="h-8 w-px bg-border"></div>
+                        <div className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold shadow-sm">
+                                {currentUser.name.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-sm font-medium mr-2">{currentUser.name}</span>
+                            <Button variant="outline" size="sm" onClick={logout} className="h-8 shadow-sm">Leave</Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+                {/* Main Header / Info Banner */}
+                <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-10 shadow-sm border mb-8 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                        <MapPin className="h-64 w-64 rotate-12" />
+                    </div>
+
+                    <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+                        <div>
+                            <div className="flex items-center gap-3 mb-2">
+                                <Badge variant="secondary" className="px-3 py-1 font-mono text-sm uppercase tracking-widest shadow-sm">
+                                    ID: {tripId}
+                                    <button onClick={handleCopyId} className="ml-2 hover:text-foreground">
+                                        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                                    </button>
+                                </Badge>
+                                {currentUser.role === 'admin' && (
+                                    <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 pb-0.5">
+                                        <ShieldCheck className="h-3 w-3 mr-1" /> Admin
+                                    </Badge>
+                                )}
+                            </div>
+                            <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4 text-slate-900 dark:text-white">
+                                {currentTrip.tripName}
+                            </h1>
+                            <div className="flex items-center text-slate-500 dark:text-slate-400 font-medium">
+                                <CalendarIcon className="mr-2 h-5 w-5" />
+                                {format(new Date(currentTrip.startDate), "MMM d")} - {format(new Date(currentTrip.endDate), "MMM d, yyyy")}
+                            </div>
+                        </div>
+
+                        <div className="w-full md:w-72 bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-sm font-medium">Packing Progress</span>
+                                <span className="text-2xl font-bold">{progressPercentage}%</span>
+                            </div>
+                            <Progress value={progressPercentage} className="h-2.5 mb-2" />
+                            <p className="text-xs text-muted-foreground text-right">
+                                {completedItems} of {totalItems} items packed
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+                    {/* Left Column: Checklist */}
+                    <div className="lg:col-span-2 flex flex-col gap-6">
+
+                        {/* Add Item Form */}
+                        <Card className="shadow-sm border-slate-200 dark:border-slate-800">
+                            <CardContent className="p-4 sm:p-6">
+                                <form onSubmit={handleAddItem} className="flex flex-col sm:flex-row gap-3">
+                                    <div className="flex-1">
+                                        <Input
+                                            placeholder="What do we need to pack? e.g. Phone Charger"
+                                            value={newItemName}
+                                            onChange={(e) => setNewItemName(e.target.value)}
+                                            className="bg-slate-50 dark:bg-slate-950/50 border-transparent focus-visible:ring-primary shadow-inner h-12 text-base"
+                                        />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <select
+                                            className="h-12 rounded-md border border-input bg-slate-50 dark:bg-slate-950/50 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring shadow-inner"
+                                            value={newItemCategory}
+                                            onChange={(e) => setNewItemCategory(e.target.value)}
+                                        >
+                                            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                        <Button type="submit" disabled={!newItemName.trim()} className="h-12 px-6 shadow-md">
+                                            <Plus className="mr-2 h-4 w-4" /> Add
+                                        </Button>
+                                    </div>
+                                </form>
+                            </CardContent>
+                        </Card>
+
+                        {/* Checklist items */}
+                        <div className="space-y-4">
+                            <h2 className="text-xl font-bold flex items-center gap-2 px-1">
+                                <CheckCircle2 className="h-5 w-5 text-primary" /> Checklist
+                            </h2>
+
+                            <AnimatePresence>
+                                {currentTrip.items.length === 0 ? (
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        className="text-center py-16 bg-white dark:bg-slate-900 border border-dashed rounded-3xl"
+                                    >
+                                        <div className="bg-slate-100 dark:bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <Plus className="h-8 w-8 text-slate-400" />
+                                        </div>
+                                        <h3 className="text-lg font-medium">List is empty</h3>
+                                        <p className="text-muted-foreground mt-1">Start adding items you need for the trip.</p>
+                                    </motion.div>
+                                ) : (
+                                    <div className="grid gap-3">
+                                        {currentTrip.items.map((item) => (
+                                            <motion.div
+                                                key={item.itemId}
+                                                layout
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, scale: 0.95 }}
+                                                className={cn(
+                                                    "group flex items-center gap-4 p-4 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm transition-all hover:shadow-md",
+                                                    item.checked && "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 opacity-75"
+                                                )}
+                                            >
+                                                <Checkbox
+                                                    checked={item.checked}
+                                                    onCheckedChange={() => toggleItem(item.itemId, item.checked)}
+                                                    className="h-6 w-6 rounded-full border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 transition-colors"
+                                                />
+
+                                                <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 overflow-hidden">
+                                                    <div className={cn("text-base font-semibold truncate transition-all", item.checked && "line-through text-slate-400")}>
+                                                        {item.itemName}
+                                                    </div>
+
+                                                    <div className="flex items-center gap-3 shrink-0">
+                                                        <Badge variant="outline" className={cn("hidden sm:inline-flex text-[10px] w-fit", getCategoryColor(item.category))}>
+                                                            {item.category}
+                                                        </Badge>
+
+                                                        <div className="flex items-center text-xs text-muted-foreground mr-2">
+                                                            <span className="hidden md:inline">Added by&nbsp;</span>
+                                                            <strong className="font-medium text-slate-700 dark:text-slate-300">{item.addedBy}</strong>
+                                                        </div>
+
+                                                        {/* Assignee Logic - Simple for now */}
+                                                        {item.assignedTo ? (
+                                                            <div className="flex -space-x-2 mr-2">
+                                                                <div className="h-6 w-6 rounded-full border-2 border-background bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold" title={`Assigned to ${currentTrip.members.find(m => m.memberId === item.assignedTo)?.name || 'Unknown'}`}>
+                                                                    {(currentTrip.members.find(m => m.memberId === item.assignedTo)?.name || '?').charAt(0).toUpperCase()}
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-6 text-xs px-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                onClick={() => assignItem(item.itemId, currentUser.memberId, currentUser.name)}
+                                                            >
+                                                                Claim
+                                                            </Button>
+                                                        )}
+
+                                                        {/* Only admin or addedBy can delete */}
+                                                        {(currentUser.role === 'admin' || item.addedBy === currentUser.name) && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-slate-400 hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                                                onClick={() => deleteItem(item.itemId)}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    </div>
+
+                    {/* Right Column: Members panel */}
+                    <div className="space-y-6">
+                        <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
+                            <CardContent className="p-6">
+                                <h3 className="font-bold flex items-center gap-2 mb-4 text-lg">
+                                    <Users className="h-5 w-5 text-indigo-500" /> Travelers ({currentTrip.members.length})
+                                </h3>
+                                <div className="space-y-4">
+                                    {currentTrip.members.map((member) => (
+                                        <div key={member.memberId} className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className={cn(
+                                                    "flex h-10 w-10 items-center justify-center rounded-full font-bold shadow-sm relative",
+                                                    member.role === 'admin' ? "bg-amber-100 text-amber-700" : "bg-indigo-100 text-indigo-700"
+                                                )}>
+                                                    {member.name.charAt(0).toUpperCase()}
+                                                    {/* Online indicator mock (everyone listed could be online or assumed online for simplicity) */}
+                                                    <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background bg-green-500"></span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-semibold">{member.name} {member.memberId === currentUser.memberId && "(You)"}</p>
+                                                    <p className="text-xs text-muted-foreground capitalize">{member.role}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    <div className="pt-4 border-t border-dashed mt-4">
+                                        <Button variant="outline" className="w-full" onClick={handleCopyId}>
+                                            <Plus className="h-4 w-4 mr-2" /> Invite More Friends
+                                        </Button>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-gradient-to-br from-indigo-500 to-primary text-white border-0">
+                            <CardContent className="p-6 relative overflow-hidden">
+                                <Zap className="h-32 w-32 absolute -right-6 -bottom-6 opacity-10" />
+                                <h3 className="font-bold text-lg mb-2 relative z-10">Real-Time Magic</h3>
+                                <p className="text-indigo-100 text-sm opacity-90 relative z-10 leading-relaxed">
+                                    Everything you do here is instantly synced across all devices. Notice how fast adding or checking an item feels!
+                                </p>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
+            </main>
+        </div>
+    )
+}
