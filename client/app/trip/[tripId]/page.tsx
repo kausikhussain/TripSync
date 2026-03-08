@@ -11,6 +11,8 @@ import {
 import confetti from "canvas-confetti"
 import { cn } from "@/lib/utils"
 
+import { QRCodeCanvas } from "qrcode.react"
+
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
 import { Input } from "@/components/ui/input"
@@ -19,6 +21,15 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
 import { useTripStore } from "@/store/useTripStore"
 import { useSocket, getSocket } from "@/hooks/useSocket"
 import { useToast } from "@/hooks/use-toast"
@@ -164,14 +175,28 @@ export default function TripDashboard() {
 
     if (loading || !currentTrip || !currentUser) {
         return (
-            <div className="flex min-h-screen items-center justify-center p-8 bg-slate-50 dark:bg-slate-950">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
-                    <p className="text-muted-foreground animate-pulse text-lg font-medium">Syncing flight paths...</p>
+            <div className="flex flex-col min-h-screen p-8 bg-slate-50 dark:bg-slate-950 max-w-7xl mx-auto space-y-8 mt-16">
+                <Skeleton className="h-64 w-full rounded-3xl" />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2 space-y-6">
+                        <Skeleton className="h-24 w-full rounded-xl" />
+                        <Skeleton className="h-20 w-full rounded-xl" />
+                        <Skeleton className="h-20 w-full rounded-xl" />
+                    </div>
+                    <div className="space-y-6">
+                        <Skeleton className="h-64 w-full rounded-xl" />
+                        <Skeleton className="h-40 w-full rounded-xl" />
+                    </div>
                 </div>
             </div>
         )
     }
+
+    // Group items by category
+    const groupedItems = categories.map(cat => ({
+        category: cat,
+        items: currentTrip.items.filter(i => i.category === cat)
+    })).filter(g => g.items.length > 0)
 
     const getCategoryColor = (cat: string) => {
         switch (cat) {
@@ -310,72 +335,78 @@ export default function TripDashboard() {
                                         <p className="text-muted-foreground mt-1">Start adding items you need for the trip.</p>
                                     </motion.div>
                                 ) : (
-                                    <div className="grid gap-3">
-                                        {currentTrip.items.map((item) => (
-                                            <motion.div
-                                                key={item.itemId}
-                                                layout
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, scale: 0.95 }}
-                                                className={cn(
-                                                    "group flex items-center gap-4 p-4 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm transition-all hover:shadow-md",
-                                                    item.checked && "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 opacity-75"
-                                                )}
-                                            >
-                                                <Checkbox
-                                                    checked={item.checked}
-                                                    onCheckedChange={() => toggleItem(item.itemId, item.checked)}
-                                                    className="h-6 w-6 rounded-full border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 transition-colors"
-                                                />
+                                    <div className="space-y-8">
+                                        {groupedItems.map((group) => (
+                                            <div key={group.category} className="space-y-3">
+                                                <h3 className={cn("text-sm font-bold uppercase tracking-wider flex items-center gap-2", getCategoryColor(group.category).split(' ')[1])}>
+                                                    <span className={cn("inline-block w-2.5 h-2.5 rounded-full", getCategoryColor(group.category).split(' ')[0])}></span>
+                                                    {group.category} <span className="text-muted-foreground text-xs bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full ml-1">{group.items.length}</span>
+                                                </h3>
+                                                <div className="grid gap-3">
+                                                    {group.items.map((item) => (
+                                                        <motion.div
+                                                            key={item.itemId}
+                                                            layout
+                                                            initial={{ opacity: 0, scale: 0.98 }}
+                                                            animate={{ opacity: 1, scale: 1 }}
+                                                            exit={{ opacity: 0, scale: 0.95 }}
+                                                            className={cn(
+                                                                "group flex items-center gap-4 p-4 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm transition-all hover:shadow-md",
+                                                                item.checked && "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 opacity-75"
+                                                            )}
+                                                        >
+                                                            <Checkbox
+                                                                checked={item.checked}
+                                                                onCheckedChange={() => toggleItem(item.itemId, item.checked)}
+                                                                className="h-6 w-6 rounded-full border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 transition-colors"
+                                                            />
 
-                                                <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 overflow-hidden">
-                                                    <div className={cn("text-base font-semibold truncate transition-all", item.checked && "line-through text-slate-400")}>
-                                                        {item.itemName}
-                                                    </div>
+                                                            <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 overflow-hidden">
+                                                                <div className={cn("text-base font-semibold truncate transition-all", item.checked && "line-through text-slate-400")}>
+                                                                    {item.itemName}
+                                                                </div>
 
-                                                    <div className="flex items-center gap-3 shrink-0">
-                                                        <Badge variant="outline" className={cn("hidden sm:inline-flex text-[10px] w-fit", getCategoryColor(item.category))}>
-                                                            {item.category}
-                                                        </Badge>
+                                                                <div className="flex items-center gap-3 shrink-0">
+                                                                    <div className="flex items-center text-xs text-muted-foreground mr-2">
+                                                                        <span className="hidden md:inline">Added by&nbsp;</span>
+                                                                        <strong className="font-medium text-slate-700 dark:text-slate-300">{item.addedBy}</strong>
+                                                                    </div>
 
-                                                        <div className="flex items-center text-xs text-muted-foreground mr-2">
-                                                            <span className="hidden md:inline">Added by&nbsp;</span>
-                                                            <strong className="font-medium text-slate-700 dark:text-slate-300">{item.addedBy}</strong>
-                                                        </div>
+                                                                    {/* Assignee Logic */}
+                                                                    {item.assignedTo ? (
+                                                                        <div className="flex -space-x-2 mr-2">
+                                                                            <div className="h-6 w-6 rounded-full border-2 border-background bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold" title={`Assigned to ${currentTrip.members.find(m => m.memberId === item.assignedTo)?.name || 'Unknown'}`}>
+                                                                                {(currentTrip.members.find(m => m.memberId === item.assignedTo)?.name || '?').charAt(0).toUpperCase()}
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            className="h-6 text-xs px-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                            onClick={() => assignItem(item.itemId, currentUser.memberId, currentUser.name)}
+                                                                        >
+                                                                            Claim
+                                                                        </Button>
+                                                                    )}
 
-                                                        {/* Assignee Logic - Simple for now */}
-                                                        {item.assignedTo ? (
-                                                            <div className="flex -space-x-2 mr-2">
-                                                                <div className="h-6 w-6 rounded-full border-2 border-background bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold" title={`Assigned to ${currentTrip.members.find(m => m.memberId === item.assignedTo)?.name || 'Unknown'}`}>
-                                                                    {(currentTrip.members.find(m => m.memberId === item.assignedTo)?.name || '?').charAt(0).toUpperCase()}
+                                                                    {/* Only admin or addedBy can delete */}
+                                                                    {(currentUser.role === 'admin' || item.addedBy === currentUser.name) && (
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-8 w-8 text-slate-400 hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                                                            onClick={() => deleteItem(item.itemId)}
+                                                                        >
+                                                                            <Trash2 className="h-4 w-4" />
+                                                                        </Button>
+                                                                    )}
                                                                 </div>
                                                             </div>
-                                                        ) : (
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className="h-6 text-xs px-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                onClick={() => assignItem(item.itemId, currentUser.memberId, currentUser.name)}
-                                                            >
-                                                                Claim
-                                                            </Button>
-                                                        )}
-
-                                                        {/* Only admin or addedBy can delete */}
-                                                        {(currentUser.role === 'admin' || item.addedBy === currentUser.name) && (
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-8 w-8 text-slate-400 hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                                                                onClick={() => deleteItem(item.itemId)}
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </Button>
-                                                        )}
-                                                    </div>
+                                                        </motion.div>
+                                                    ))}
                                                 </div>
-                                            </motion.div>
+                                            </div>
                                         ))}
                                     </div>
                                 )}
@@ -410,10 +441,42 @@ export default function TripDashboard() {
                                         </div>
                                     ))}
 
-                                    <div className="pt-4 border-t border-dashed mt-4">
+                                    <div className="pt-4 border-t border-dashed mt-4 grid grid-cols-2 gap-2">
                                         <Button variant="outline" className="w-full" onClick={handleCopyId}>
-                                            <Plus className="h-4 w-4 mr-2" /> Invite More Friends
+                                            <Copy className="h-4 w-4 mr-2" /> Copy ID
                                         </Button>
+
+                                        <Dialog>
+                                            <DialogTrigger asChild>
+                                                <Button className="w-full">
+                                                    <Plus className="h-4 w-4 mr-2" /> Invite QR
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent className="sm:max-w-md text-center flex flex-col items-center p-8 bg-white dark:bg-slate-950">
+                                                <DialogHeader>
+                                                    <DialogTitle className="text-2xl font-bold">Invite Travelers</DialogTitle>
+                                                    <DialogDescription>
+                                                        Scan this code to instantly join {currentTrip.tripName}
+                                                    </DialogDescription>
+                                                </DialogHeader>
+                                                <div className="bg-white p-4 rounded-xl shadow-inner border my-6">
+                                                    <QRCodeCanvas
+                                                        value={`${window.location.origin}/join?id=${tripId}`}
+                                                        size={200}
+                                                        level={"H"}
+                                                        imageSettings={{
+                                                            src: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.2-1.1.6L2.5 8l6 3.1L7 12 4.5 11l-2 2 4 4 2-2-1-2.5 1-1.5 3.1 6 1.2-1.2c.4-.2.7-.6.6-1.1Z'/></svg>",
+                                                            height: 30,
+                                                            width: 30,
+                                                            excavate: true,
+                                                        }}
+                                                    />
+                                                </div>
+                                                <p className="font-mono text-xl tracking-widest bg-slate-100 dark:bg-slate-900 px-6 py-2 rounded-full font-bold">
+                                                    {tripId}
+                                                </p>
+                                            </DialogContent>
+                                        </Dialog>
                                     </div>
                                 </div>
                             </CardContent>
