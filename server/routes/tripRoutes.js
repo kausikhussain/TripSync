@@ -24,7 +24,7 @@ router.post('/create', async (req, res) => {
             tripName,
             startDate,
             endDate,
-            createdBy: adminId,
+            creatorId: adminId,
             members: [{
                 memberId: adminId,
                 name: adminName,
@@ -109,7 +109,7 @@ router.delete('/:tripId', async (req, res) => {
         const trip = await Trip.findOne({ tripId: req.params.tripId.toUpperCase() });
 
         if (!trip) return res.status(404).json({ error: 'Trip not found' });
-        if (trip.createdBy !== memberId) {
+        if (trip.creatorId !== memberId) {
             return res.status(403).json({ error: 'Only admin can delete trip' });
         }
 
