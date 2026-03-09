@@ -5,11 +5,12 @@ const itemSchema = new mongoose.Schema({
     itemName: { type: String, required: true },
     category: { type: String, required: true, default: 'Essentials' },
     checked: { type: Boolean, default: false },
+    category: { type: String, default: 'Essentials' },
     addedBy: { type: String, required: true },
-    assignedTo: { type: String, default: null },
-    checkedBy: { type: String, default: null },
-    createdAt: { type: Date, default: Date.now }
-});
+    checked: { type: Boolean, default: false },
+    checkedBy: { type: String, default: null }, // memberId who checked it
+    assignedTo: { type: String, default: null } // memberId
+}, { _id: false });
 
 const memberSchema = new mongoose.Schema({
     memberId: { type: String, required: true },
@@ -18,15 +19,30 @@ const memberSchema = new mongoose.Schema({
     joinedAt: { type: Date, default: Date.now }
 });
 
+const expenseSchema = new mongoose.Schema({
+    expenseId: { type: String, required: true },
+    description: { type: String, required: true },
+    amount: { type: Number, required: true },
+    paidBy: { type: String, required: true }, // memberId
+    date: { type: Date, default: Date.now },
+}, { _id: false });
+
+const activitySchema = new mongoose.Schema({
+    activityId: { type: String, required: true },
+    text: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now }
+}, { _id: false });
+
 const tripSchema = new mongoose.Schema({
-    tripId: { type: String, required: true, unique: true, index: true },
+    tripId: { type: String, required: true, unique: true },
     tripName: { type: String, required: true },
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
-    createdBy: { type: String, required: true }, // memberId of admin
+    creatorId: { type: String, required: true }, // memberId of admin
     members: [memberSchema],
     items: [itemSchema],
-    createdAt: { type: Date, default: Date.now }
-});
+    expenses: [expenseSchema],
+    activities: [activitySchema]
+}, { timestamps: true });
 
 export const Trip = mongoose.model('Trip', tripSchema);

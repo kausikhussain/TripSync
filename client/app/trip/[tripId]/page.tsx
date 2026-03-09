@@ -6,12 +6,16 @@ import { motion, AnimatePresence } from "framer-motion"
 import { format } from "date-fns"
 import {
     Users, CalendarIcon, Plus, Trash2, CheckCircle2,
-    Circle, MapPin, Search, Copy, Check, Clock, ShieldCheck, Zap
+    Circle, MapPin, Search, Copy, Check, Clock, ShieldCheck, Zap,
+    Activity as ActivityIcon, DollarSign, Receipt
 } from "lucide-react"
 import confetti from "canvas-confetti"
 import { cn } from "@/lib/utils"
 
 import { QRCodeCanvas } from "qrcode.react"
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
@@ -55,6 +59,9 @@ export default function TripDashboard() {
     const [copied, setCopied] = useState(false)
     const [newItemName, setNewItemName] = useState("")
     const [newItemCategory, setNewItemCategory] = useState("Essentials")
+
+    const [newExpenseDesc, setNewExpenseDesc] = useState("")
+    const [newExpenseAmount, setNewExpenseAmount] = useState("")
 
     const categories = ["Clothes", "Electronics", "Essentials", "Documents"]
 
@@ -142,6 +149,32 @@ export default function TripDashboard() {
         const skt = getSocket()
         if (skt) {
             skt.emit('assign_item', { tripId, itemId, assigneeId, assigneeName })
+        }
+    }
+
+    const handleAddExpense = (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newExpenseDesc.trim() || !newExpenseAmount || !currentUser) return
+
+        const skt = getSocket()
+        if (skt) {
+            skt.emit('add_expense', {
+                tripId,
+                description: newExpenseDesc.trim(),
+                amount: newExpenseAmount,
+                paidBy: currentUser.memberId,
+                memberName: currentUser.name
+            })
+            setNewExpenseDesc("")
+            setNewExpenseAmount("")
+        }
+    }
+
+    const handleDeleteExpense = (expenseId: string) => {
+        if (!currentUser) return
+        const skt = getSocket()
+        if (skt) {
+            skt.emit('delete_expense', { tripId, expenseId, memberName: currentUser.name })
         }
     }
 
@@ -284,134 +317,247 @@ export default function TripDashboard() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-                    {/* Left Column: Checklist */}
+                    {/* Left Column: Interactive Workspace */}
                     <div className="lg:col-span-2 flex flex-col gap-6">
 
-                        {/* Add Item Form */}
-                        <Card className="shadow-sm border-slate-200 dark:border-slate-800">
-                            <CardContent className="p-4 sm:p-6">
-                                <form onSubmit={handleAddItem} className="flex flex-col sm:flex-row gap-3">
-                                    <div className="flex-1">
-                                        <Input
-                                            placeholder="What do we need to pack? e.g. Phone Charger"
-                                            value={newItemName}
-                                            onChange={(e) => setNewItemName(e.target.value)}
-                                            className="bg-slate-50 dark:bg-slate-950/50 border-transparent focus-visible:ring-primary shadow-inner h-12 text-base"
-                                        />
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <select
-                                            className="h-12 rounded-md border border-input bg-slate-50 dark:bg-slate-950/50 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring shadow-inner"
-                                            value={newItemCategory}
-                                            onChange={(e) => setNewItemCategory(e.target.value)}
-                                        >
-                                            {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
-                                        <Button type="submit" disabled={!newItemName.trim()} className="h-12 px-6 shadow-md">
-                                            <Plus className="mr-2 h-4 w-4" /> Add
-                                        </Button>
-                                    </div>
-                                </form>
-                            </CardContent>
-                        </Card>
+                        <Tabs defaultValue="checklist" className="w-full">
+                            <TabsList className="grid w-full grid-cols-3 mb-6 bg-slate-100 dark:bg-slate-900 border shadow-sm">
+                                <TabsTrigger value="checklist" className="data-[state=active]:shadow-sm"><CheckCircle2 className="w-4 h-4 mr-2" /> Checklist</TabsTrigger>
+                                <TabsTrigger value="finance" className="data-[state=active]:shadow-sm"><DollarSign className="w-4 h-4 mr-2" /> Expenses</TabsTrigger>
+                                <TabsTrigger value="activity" className="data-[state=active]:shadow-sm"><ActivityIcon className="w-4 h-4 mr-2" /> Activity Feed</TabsTrigger>
+                            </TabsList>
 
-                        {/* Checklist items */}
-                        <div className="space-y-4">
-                            <h2 className="text-xl font-bold flex items-center gap-2 px-1">
-                                <CheckCircle2 className="h-5 w-5 text-primary" /> Checklist
-                            </h2>
-
-                            <AnimatePresence>
-                                {currentTrip.items.length === 0 ? (
-                                    <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        className="text-center py-16 bg-white dark:bg-slate-900 border border-dashed rounded-3xl"
-                                    >
-                                        <div className="bg-slate-100 dark:bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                                            <Plus className="h-8 w-8 text-slate-400" />
-                                        </div>
-                                        <h3 className="text-lg font-medium">List is empty</h3>
-                                        <p className="text-muted-foreground mt-1">Start adding items you need for the trip.</p>
-                                    </motion.div>
-                                ) : (
-                                    <div className="space-y-8">
-                                        {groupedItems.map((group) => (
-                                            <div key={group.category} className="space-y-3">
-                                                <h3 className={cn("text-sm font-bold uppercase tracking-wider flex items-center gap-2", getCategoryColor(group.category).split(' ')[1])}>
-                                                    <span className={cn("inline-block w-2.5 h-2.5 rounded-full", getCategoryColor(group.category).split(' ')[0])}></span>
-                                                    {group.category} <span className="text-muted-foreground text-xs bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full ml-1">{group.items.length}</span>
-                                                </h3>
-                                                <div className="grid gap-3">
-                                                    {group.items.map((item) => (
-                                                        <motion.div
-                                                            key={item.itemId}
-                                                            layout
-                                                            initial={{ opacity: 0, scale: 0.98 }}
-                                                            animate={{ opacity: 1, scale: 1 }}
-                                                            exit={{ opacity: 0, scale: 0.95 }}
-                                                            className={cn(
-                                                                "group flex items-center gap-4 p-4 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm transition-all hover:shadow-md",
-                                                                item.checked && "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 opacity-75"
-                                                            )}
-                                                        >
-                                                            <Checkbox
-                                                                checked={item.checked}
-                                                                onCheckedChange={() => toggleItem(item.itemId, item.checked)}
-                                                                className="h-6 w-6 rounded-full border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 transition-colors"
-                                                            />
-
-                                                            <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 overflow-hidden">
-                                                                <div className={cn("text-base font-semibold truncate transition-all", item.checked && "line-through text-slate-400")}>
-                                                                    {item.itemName}
-                                                                </div>
-
-                                                                <div className="flex items-center gap-3 shrink-0">
-                                                                    <div className="flex items-center text-xs text-muted-foreground mr-2">
-                                                                        <span className="hidden md:inline">Added by&nbsp;</span>
-                                                                        <strong className="font-medium text-slate-700 dark:text-slate-300">{item.addedBy}</strong>
-                                                                    </div>
-
-                                                                    {/* Assignee Logic */}
-                                                                    {item.assignedTo ? (
-                                                                        <div className="flex -space-x-2 mr-2">
-                                                                            <div className="h-6 w-6 rounded-full border-2 border-background bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold" title={`Assigned to ${currentTrip.members.find(m => m.memberId === item.assignedTo)?.name || 'Unknown'}`}>
-                                                                                {(currentTrip.members.find(m => m.memberId === item.assignedTo)?.name || '?').charAt(0).toUpperCase()}
-                                                                            </div>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            className="h-6 text-xs px-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                            onClick={() => assignItem(item.itemId, currentUser.memberId, currentUser.name)}
-                                                                        >
-                                                                            Claim
-                                                                        </Button>
-                                                                    )}
-
-                                                                    {/* Only admin or addedBy can delete */}
-                                                                    {(currentUser.role === 'admin' || item.addedBy === currentUser.name) && (
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-8 w-8 text-slate-400 hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                                                                            onClick={() => deleteItem(item.itemId)}
-                                                                        >
-                                                                            <Trash2 className="h-4 w-4" />
-                                                                        </Button>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </motion.div>
-                                                    ))}
-                                                </div>
+                            {/* CHECKLIST TAB */}
+                            <TabsContent value="checklist" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500 max-h-[800px] flex flex-col">
+                                <Card className="shadow-sm border-slate-200 dark:border-slate-800 shrink-0">
+                                    <CardContent className="p-4 sm:p-6">
+                                        <form onSubmit={handleAddItem} className="flex flex-col sm:flex-row gap-3">
+                                            <div className="flex-1">
+                                                <Input
+                                                    placeholder="What do we need to pack? e.g. Phone Charger"
+                                                    value={newItemName}
+                                                    onChange={(e) => setNewItemName(e.target.value)}
+                                                    className="bg-slate-50 dark:bg-slate-950/50 border-transparent focus-visible:ring-primary shadow-inner h-12 text-base"
+                                                />
                                             </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </AnimatePresence>
-                        </div>
+                                            <div className="flex gap-2">
+                                                <select
+                                                    className="h-12 rounded-md border border-input bg-slate-50 dark:bg-slate-950/50 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring shadow-inner"
+                                                    value={newItemCategory}
+                                                    onChange={(e) => setNewItemCategory(e.target.value)}
+                                                >
+                                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                                </select>
+                                                <Button type="submit" disabled={!newItemName.trim()} className="h-12 px-6 shadow-md">
+                                                    <Plus className="mr-2 h-4 w-4" /> Add
+                                                </Button>
+                                            </div>
+                                        </form>
+                                    </CardContent>
+                                </Card>
+
+                                <ScrollArea className="flex-1 pr-4 -mr-4 h-[600px]">
+                                    <AnimatePresence>
+                                        {currentTrip.items.length === 0 ? (
+                                            <motion.div
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                className="text-center py-16 bg-white dark:bg-slate-900 border border-dashed rounded-3xl"
+                                            >
+                                                <div className="bg-slate-100 dark:bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                    <Plus className="h-8 w-8 text-slate-400" />
+                                                </div>
+                                                <h3 className="text-lg font-medium">List is empty</h3>
+                                                <p className="text-muted-foreground mt-1">Start adding items you need for the trip.</p>
+                                            </motion.div>
+                                        ) : (
+                                            <div className="space-y-8 pb-4">
+                                                {groupedItems.map((group) => (
+                                                    <div key={group.category} className="space-y-3">
+                                                        <h3 className={cn("text-sm font-bold uppercase tracking-wider flex items-center gap-2", getCategoryColor(group.category).split(' ')[1])}>
+                                                            <span className={cn("inline-block w-2.5 h-2.5 rounded-full", getCategoryColor(group.category).split(' ')[0])}></span>
+                                                            {group.category} <span className="text-muted-foreground text-xs bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full ml-1">{group.items.length}</span>
+                                                        </h3>
+                                                        <div className="grid gap-3">
+                                                            {group.items.map((item) => (
+                                                                <motion.div
+                                                                    key={item.itemId}
+                                                                    layout
+                                                                    initial={{ opacity: 0, scale: 0.98 }}
+                                                                    animate={{ opacity: 1, scale: 1 }}
+                                                                    exit={{ opacity: 0, scale: 0.95 }}
+                                                                    className={cn(
+                                                                        "group flex items-center gap-4 p-4 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm transition-all hover:shadow-md",
+                                                                        item.checked && "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 opacity-75"
+                                                                    )}
+                                                                >
+                                                                    <Checkbox
+                                                                        checked={item.checked}
+                                                                        onCheckedChange={() => toggleItem(item.itemId, item.checked)}
+                                                                        className="h-6 w-6 rounded-full border-2 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 transition-colors"
+                                                                    />
+
+                                                                    <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 overflow-hidden">
+                                                                        <div className={cn("text-base font-semibold truncate transition-all", item.checked && "line-through text-slate-400")}>
+                                                                            {item.itemName}
+                                                                        </div>
+
+                                                                        <div className="flex items-center gap-3 shrink-0">
+                                                                            <div className="flex items-center text-xs text-muted-foreground mr-2">
+                                                                                <span className="hidden md:inline">Added by&nbsp;</span>
+                                                                                <strong className="font-medium text-slate-700 dark:text-slate-300">{item.addedBy}</strong>
+                                                                            </div>
+
+                                                                            {item.assignedTo ? (
+                                                                                <div className="flex -space-x-2 mr-2">
+                                                                                    <div className="h-6 w-6 rounded-full border-2 border-background bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold" title={`Assigned to ${currentTrip.members.find(m => m.memberId === item.assignedTo)?.name || 'Unknown'}`}>
+                                                                                        {(currentTrip.members.find(m => m.memberId === item.assignedTo)?.name || '?').charAt(0).toUpperCase()}
+                                                                                    </div>
+                                                                                </div>
+                                                                            ) : (
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="sm"
+                                                                                    className="h-6 text-xs px-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                                    onClick={() => assignItem(item.itemId, currentUser.memberId, currentUser.name)}
+                                                                                >
+                                                                                    Claim
+                                                                                </Button>
+                                                                            )}
+
+                                                                            {(currentUser.role === 'admin' || item.addedBy === currentUser.name) && (
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    className="h-8 w-8 text-slate-400 hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                                                                    onClick={() => deleteItem(item.itemId)}
+                                                                                >
+                                                                                    <Trash2 className="h-4 w-4" />
+                                                                                </Button>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </motion.div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </AnimatePresence>
+                                </ScrollArea>
+                            </TabsContent>
+
+                            {/* EXPENSES TAB */}
+                            <TabsContent value="finance" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                <Card className="shadow-sm border-slate-200 dark:border-slate-800">
+                                    <CardContent className="p-4 sm:p-6">
+                                        <form onSubmit={handleAddExpense} className="flex flex-col sm:flex-row gap-3">
+                                            <div className="flex-1">
+                                                <Input
+                                                    placeholder="What did we pay for? e.g. Dinner"
+                                                    value={newExpenseDesc}
+                                                    onChange={(e) => setNewExpenseDesc(e.target.value)}
+                                                    className="bg-slate-50 dark:bg-slate-950/50 border-transparent focus-visible:ring-primary shadow-inner h-12 text-base"
+                                                />
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        placeholder="0.00"
+                                                        value={newExpenseAmount}
+                                                        onChange={(e) => setNewExpenseAmount(e.target.value)}
+                                                        className="pl-7 bg-slate-50 dark:bg-slate-950/50 border-transparent focus-visible:ring-primary shadow-inner h-12 w-28 text-base"
+                                                    />
+                                                </div>
+                                                <Button type="submit" disabled={!newExpenseDesc.trim() || !newExpenseAmount} className="h-12 px-6 shadow-md">
+                                                    <Plus className="mr-2 h-4 w-4" /> Log
+                                                </Button>
+                                            </div>
+                                        </form>
+                                    </CardContent>
+                                </Card>
+
+                                <div className="grid gap-3 max-h-[500px] overflow-y-auto pr-2">
+                                    {!currentTrip.expenses || currentTrip.expenses.length === 0 ? (
+                                        <div className="text-center py-16 bg-white dark:bg-slate-900 border border-dashed rounded-3xl">
+                                            <div className="bg-amber-100 dark:bg-amber-900/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                <Receipt className="h-8 w-8 text-amber-500" />
+                                            </div>
+                                            <h3 className="text-lg font-medium">No expenses yet</h3>
+                                            <p className="text-muted-foreground mt-1">Keep track of who paid for what.</p>
+                                        </div>
+                                    ) : (
+                                        currentTrip.expenses.map((expense) => {
+                                            const payer = currentTrip.members.find(m => m.memberId === expense.paidBy)?.name || 'Unknown'
+                                            return (
+                                                <motion.div
+                                                    key={expense.expenseId}
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    className="group flex items-center justify-between p-4 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm hover:shadow-md transition-all"
+                                                >
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+                                                            <DollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-semibold text-base">{expense.description}</p>
+                                                            <p className="text-xs text-muted-foreground">Paid by <strong className="text-foreground">{payer}</strong> on {format(new Date(expense.date), "MMM d")}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-4">
+                                                        <span className="font-extrabold text-lg">${Number(expense.amount).toFixed(2)}</span>
+                                                        {(currentUser.role === 'admin' || expense.paidBy === currentUser.memberId) && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-slate-400 hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                onClick={() => handleDeleteExpense(expense.expenseId)}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </motion.div>
+                                            )
+                                        })
+                                    )}
+                                </div>
+                            </TabsContent>
+
+                            {/* ACTIVITY LOG TAB */}
+                            <TabsContent value="activity" className="animate-in fade-in slide-in-from-bottom-2 duration-500 bg-white dark:bg-slate-900 border rounded-3xl p-6 shadow-sm">
+                                <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
+                                    <Clock className="h-5 w-5 text-indigo-500" /> Recent Activity
+                                </h3>
+                                <div className="space-y-6 pl-2 relative before:absolute before:inset-0 before:ml-4 before:-translate-x-px before:w-0.5 before:bg-gradient-to-b before:from-indigo-100 before:via-indigo-100 before:to-transparent dark:before:from-indigo-900 dark:before:via-indigo-900">
+                                    {!currentTrip.activities || currentTrip.activities.length === 0 ? (
+                                        <p className="text-muted-foreground text-sm ml-6">No activity recorded yet.</p>
+                                    ) : (
+                                        currentTrip.activities.map((act) => (
+                                            <motion.div
+                                                key={act.activityId}
+                                                initial={{ opacity: 0, x: -10 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                className="relative flex items-center gap-6"
+                                            >
+                                                <div className="absolute left-0 h-4 w-4 rounded-full bg-indigo-500 ring-4 ring-white dark:ring-slate-900" />
+                                                <div className="flex-1 ml-6 bg-slate-50 dark:bg-slate-950/50 p-3 rounded-xl border shadow-sm">
+                                                    <p className="text-sm font-medium">{act.text}</p>
+                                                    <p className="text-xs text-muted-foreground mt-1">{format(new Date(act.timestamp), "MMM d, h:mm a")}</p>
+                                                </div>
+                                            </motion.div>
+                                        ))
+                                    )}
+                                </div>
+                            </TabsContent>
+                        </Tabs>
+
                     </div>
 
                     {/* Right Column: Members panel */}

@@ -9,19 +9,35 @@ export interface Item {
     itemId: string;
     itemName: string;
     category: string;
+    addedBy: string;
     checked: boolean;
-    addedBy: string; // member name or ID
-    assignedTo: string | null;
     checkedBy: string | null;
-    createdAt?: string;
+    assignedTo: string | null;
+}
+
+export interface Expense {
+    expenseId: string;
+    description: string;
+    amount: number;
+    paidBy: string; // memberId
+    date: string;
+}
+
+export interface Activity {
+    activityId: string;
+    text: string;
+    timestamp: string;
 }
 
 export interface Trip {
+    _id: string;
     tripId: string;
     tripName: string;
     startDate: string;
     endDate: string;
-    createdBy: string;
+    creatorId: string;
     members: Member[];
     items: Item[];
+    expenses: Expense[];
+    activities: Activity[];
 }

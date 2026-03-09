@@ -14,7 +14,10 @@ export const useSocket = (tripId: string | undefined) => {
         deleteItem,
         toggleItem,
         assignItem,
-        addMember
+        addMember,
+        addExpense,
+        deleteExpense,
+        addActivity
     } = useTripStore();
 
     useEffect(() => {
@@ -64,13 +67,25 @@ export const useSocket = (tripId: string | undefined) => {
             assignItem(itemId, assigneeId);
         });
 
+        socket.on('expense_added', (expense) => {
+            addExpense(expense);
+        });
+
+        socket.on('expense_deleted', ({ expenseId }) => {
+            deleteExpense(expenseId);
+        });
+
+        socket.on('activity_logged', (activity) => {
+            addActivity(activity);
+        });
+
         return () => {
             if (socket) {
                 socket.disconnect();
                 socket = null;
             }
         };
-    }, [tripId, currentUser, setConnectionStatus, addItem, deleteItem, toggleItem, assignItem, addMember]);
+    }, [tripId, currentUser, setConnectionStatus, addItem, deleteItem, toggleItem, assignItem, addMember, addExpense, deleteExpense, addActivity]);
 
     return { socket };
 };

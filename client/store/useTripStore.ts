@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Trip, Member, Item } from '../types';
+import { Trip, Member, Item, Expense, Activity } from '../types';
 
 interface TripState {
     currentTrip: Trip | null;
@@ -18,6 +18,9 @@ interface TripState {
     toggleItem: (itemId: string, checked: boolean, checkedBy: string | null) => void;
     assignItem: (itemId: string, assigneeId: string | null) => void;
     addMember: (member: Member) => void;
+    addExpense: (expense: Expense) => void;
+    deleteExpense: (expenseId: string) => void;
+    addActivity: (activity: Activity) => void;
 
     // Reset
     clearTrip: () => void;
@@ -92,6 +95,38 @@ export const useTripStore = create<TripState>()(
                     currentTrip: {
                         ...state.currentTrip,
                         members: [...state.currentTrip.members, member]
+                    }
+                };
+            }),
+
+            addExpense: (expense) => set((state) => {
+                if (!state.currentTrip) return state;
+                if (state.currentTrip.expenses?.find(e => e.expenseId === expense.expenseId)) return state;
+                return {
+                    currentTrip: {
+                        ...state.currentTrip,
+                        expenses: [...(state.currentTrip.expenses || []), expense]
+                    }
+                };
+            }),
+
+            deleteExpense: (expenseId) => set((state) => {
+                if (!state.currentTrip) return state;
+                return {
+                    currentTrip: {
+                        ...state.currentTrip,
+                        expenses: (state.currentTrip.expenses || []).filter(e => e.expenseId !== expenseId)
+                    }
+                };
+            }),
+
+            addActivity: (activity) => set((state) => {
+                if (!state.currentTrip) return state;
+                if (state.currentTrip.activities?.find(a => a.activityId === activity.activityId)) return state;
+                return {
+                    currentTrip: {
+                        ...state.currentTrip,
+                        activities: [activity, ...(state.currentTrip.activities || [])]
                     }
                 };
             }),
