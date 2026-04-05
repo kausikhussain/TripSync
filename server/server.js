@@ -19,8 +19,17 @@ const io = new Server(server, {
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  methods: ['GET', 'POST', 'DELETE'],
+  credentials: true
+}));
 app.use(express.json());
+
+// Health Check for Render
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
 
 // Routes
 app.use('/api/trip', tripRoutes);
