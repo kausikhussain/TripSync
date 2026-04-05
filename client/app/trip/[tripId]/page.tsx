@@ -80,7 +80,7 @@ export default function TripDashboard() {
         if (!currentTrip) {
             const fetchTrip = async () => {
                 try {
-                    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'
+                    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'https://tripsync-ubtj.onrender.com'
                     const res = await fetch(`${serverUrl}/api/trip/${tripId}`)
                     if (!res.ok) throw new Error("Trip not found")
                     const data = await res.json()

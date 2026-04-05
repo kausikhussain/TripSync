@@ -24,7 +24,7 @@ export const useSocket = (tripId: string | undefined) => {
         if (!tripId || !currentUser) return;
 
         // Connect to server
-        const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000';
+        const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'https://tripsync-ubtj.onrender.com';
         socket = io(serverUrl);
 
         socket.on('connect', () => {

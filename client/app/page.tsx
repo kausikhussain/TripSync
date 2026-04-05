@@ -3,11 +3,8 @@
 import { motion } from "framer-motion"
 import Link from "next/link"
 import { PlaneTakeoff, Users, Zap, CheckCircle2 } from "lucide-react"
-
 import { Button } from "@/components/ui/button"
-
 import { ModeToggle } from "@/components/mode-toggle"
-
 export default function Home() {
     const containerVariants = {
         hidden: { opacity: 0 },
@@ -16,7 +13,6 @@ export default function Home() {
             transition: { staggerChildren: 0.1 }
         }
     }
-
     const childVariants: any = {
         hidden: { y: 20, opacity: 0 },
         visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 300, damping: 24 } }

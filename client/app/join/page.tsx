@@ -42,7 +42,7 @@ export default function JoinTripPage() {
         setLoading(true)
 
         try {
-            const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000'
+            const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'https://tripsync-ubtj.onrender.com'
             const response = await fetch(`${serverUrl}/api/trip/join`, {
                 method: 'POST',
                 headers: {
